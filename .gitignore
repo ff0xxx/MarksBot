@@ -1,0 +1,7 @@
+/.idea/
+config_data/.env
+
+.mypy_cache/
+.vscode/
+venv/
+__pycache__/
