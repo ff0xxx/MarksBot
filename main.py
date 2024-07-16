@@ -4,8 +4,7 @@ from aiogram                import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums          import ParseMode
 from config_data.config     import Config, load_config
-from handlers               import user_handlers, other_handlers
-
+from handlers import main_handlers, user_handlers, admin_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +23,9 @@ async def main() -> None:
     bot = Bot(token=config.tg_bot.token, default=default_properties)
     dp = Dispatcher()
 
+    dp.include_router(main_handlers.router)
     dp.include_router(user_handlers.router)
-    dp.include_router(other_handlers.router)
+    dp.include_router(admin_handlers.router)
 
     logger.info('Starting bot')
 
