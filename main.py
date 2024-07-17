@@ -5,6 +5,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums          import ParseMode
 from config_data.config     import Config, load_config
 from handlers import main_handlers, user_handlers, admin_handlers
+from database.database      import db
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ async def main() -> None:
 
     logger.info('Starting bot')
 
+    db.create_tables()
     await bot.delete_webhook(drop_pending_updates=True)  # delete updates
     await dp.start_polling(bot)
 
