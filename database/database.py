@@ -5,7 +5,8 @@ import sqlite3
 class DatabaseManager:
     def __init__(self, database_file):  # 'tg.db'
         self.database_file = database_file
-        self.connection = sqlite3.connect(database_file)  # чтобы создать бд, если ее нет
+        self.connection = sqlite3.connect(database_file)  # КОСТЫЛЬ: check_same_thread=False
+        # С НИМ НЕТ ОШИБКИ, НО ПОЛОВИНА БОТА ВСЕ РАВНО НЕ РАБОТАЕТ
         self.cursor = self.connection.cursor()
 
     def create_tables(self):
@@ -58,6 +59,8 @@ class DatabaseManager:
 
         self.connection.commit()
 
+    ##### Методы
+
     def add_user(self, user_id):
         self.cursor.execute("SELECT 1 FROM Users WHERE user_id = ?", (user_id,))
         user_exists = self.cursor.fetchone()
@@ -71,10 +74,17 @@ class DatabaseManager:
             # Добавляем подписку на категорию "news"
             self.add_subscription(user_id, 1)
 
-    def add_category(self, parent_id, level, name):  # subcategory: меняй level (с 1 на 2)
+    def add_category(self, name):
         self.cursor.execute(
             "INSERT INTO Categories (parent_id, level, name) VALUES (?, ?, ?)",
-            (parent_id, level, name)
+            (None, 1, name)
+        )
+        self.connection.commit()
+
+    def add_subcategory(self, parent_id, name):
+        self.cursor.execute(
+            "INSERT INTO Categories (parent_id, level, name) VALUES (?, ?, ?)",
+            (parent_id, 2, name)
         )
         self.connection.commit()
 
@@ -92,10 +102,66 @@ class DatabaseManager:
         )
         self.connection.commit()
 
-    # - get_user_by_id
-    # - get_category_by_id
-    # - get_subscribed_posts
+    ##### Category
+
+    def get_cat_id_by_name(self, name):
+        self.cursor.execute(
+            'SELECT id FROM Categories WHERE name=?',
+            (name,)
+        )
+        return self.cursor.fetchone()
+
+    def get_all_categories(self):
+        self.cursor.execute(
+            'SELECT id, name FROM Categories'
+        )
+        return self.cursor.fetchall()
+
+    def get_categories_by_user_id(self, user_id):
+        self.cursor.execute(
+            """
+            SELECT c.id, c.name
+            FROM Subscriptions s
+            JOIN Categories c ON s.category_id = c.id
+            WHERE s.user_id = ?
+            """,
+            (user_id, )
+        )
+        return self.cursor.fetchall()  # пошла жара
+
+    def unsubscribe_user_from_category(self, user_id, category_name):
+        # Получаем id категории по ее названию
+        self.cursor.execute(
+            'SELECT id FROM Categories WHERE name = ?',
+            (category_name,)
+        )
+        category_id = self.cursor.fetchone()[0]
+
+        # Удаляем запись из таблицы Subscriptions
+        self.cursor.execute(
+            'DELETE FROM Subscriptions WHERE user_id = ? AND category_id = ?',
+            (user_id, category_id)
+        )
+        self.connection.commit()
+
+    def subscribe_user_from_category(self, user_id, category_name):
+        # Получаем id категории по ее названию
+        self.cursor.execute(
+            'SELECT id FROM Categories WHERE name = ?',
+            (category_name,)
+        )
+        category_id = self.cursor.fetchone()[0]
+
+        # Добавляем запись в таблицу Subscriptions
+        self.cursor.execute(
+            'INSERT INTO Subscriptions (user_id, category_id) VALUES (?, ?)',
+            (user_id, category_id)
+        )
+        self.connection.commit()
+
     # - get_scheduled_posts
+
+    # - get_subscribed_posts ДАВАЙ ТИПО ЕЩЕ СПРАШИВАТЬ СКОЛЬКО ПОСЛЕДНИХ ПУБЛИКАЦИЙ ТЕБЕ
     # и т.д.
 
     def close(self):
