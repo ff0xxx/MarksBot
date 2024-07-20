@@ -3,9 +3,17 @@ LEXICON_RU: dict[str: str] = {
 
     '/start': 'Привет, это бот для рассылки!',
 
+    '/about': 'Marks 19 y.o',
+
     '/help': 'Помощь пользователю',
 
     'echo': 'Я тебя не понимаю.',
 
-    'about': 'Marks 19 y.o',
+}
+
+LEXICON_COMMANDS = {
+    '/menu': 'Открыть меню',
+
+    '/about': 'О закачике',
+
 }

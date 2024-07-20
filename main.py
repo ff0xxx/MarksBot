@@ -1,39 +1,58 @@
-import logging
 import asyncio
-from aiogram                import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums          import ParseMode
-from config_data.config     import Config, load_config
-from handlers import main_handlers, user_handlers, admin_handlers
-from database.database      import db
-
-logger = logging.getLogger(__name__)
+import logging
+from create_bot         import bot, dp, admins
+from db_handler.db_funk import create_tables
+from keyboards.set_menu import set_main_menu
+from handlers           import main_handlers, user_handlers, admin_handlers
+from middlewares.admin_middleware import AdminMiddleware
 
 
-async def main() -> None:
+# Функция, которая выполнится когда бот запустится
+async def start_bot():
+    await set_main_menu(bot)
+    try:
+        for admin_id in admins:
+            await bot.send_message(admin_id, f'Бот запущен')
+    except:
+        pass
+
+
+# Функция, которая выполнится когда бот завершит свою работу
+async def stop_bot():
+    try:
+        for admin_id in admins:
+            await bot.send_message(admin_id, 'Бот остановлен')
+    except:
+        pass
+
+
+async def main():
 
     logging.basicConfig(
         level=logging.INFO,
         format='%(filename)s:%(lineno)d #%(levelname)-8s [%(asctime)s] %(name)s %(message)s'
     )
 
-    config: Config = load_config()
-
-    default_properties = DefaultBotProperties(parse_mode=ParseMode.HTML)
-
-    bot = Bot(token=config.tg_bot.token, default=default_properties)
-    dp = Dispatcher()
+    # регистрация функций при старте и завершении работы бота
+    dp.startup.register(start_bot)
+    dp.shutdown.register(stop_bot)
 
     dp.include_router(main_handlers.router)
     dp.include_router(user_handlers.router)
     dp.include_router(admin_handlers.router)
 
-    logger.info('Starting bot')
+    admin_handlers.router.message.middleware(AdminMiddleware())
 
-    db.create_tables()
-    await bot.delete_webhook(drop_pending_updates=True)  # delete updates
-    await dp.start_polling(bot)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info('Starting bot')
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    finally:
+        await bot.session.close()
 
+logger = logging.getLogger(__name__)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    asyncio.run(create_tables())
     asyncio.run(main())
+

@@ -1,85 +1,90 @@
 from aiogram                        import Router, F
-from aiogram.dispatcher.event.bases import CancelHandler
 from aiogram.types                  import Message
-
-from keyboards.keyboards import all_category_keyboard
+from db_handler.db_funk             import add_category, get_cat_id_by_name, add_subcategory
+from keyboards.keyboards            import all_category_keyboard
 from lexicon.lexicon_ru             import LEXICON_RU
-from config_data.config             import load_config
-from database.database              import db
 
 router: Router = Router()
 
 
-# декоратор для проверки от админа ли пришло сообщение
-def is_admin(func):
-    async def wrapper(message: Message):
-        if message.from_user.id in load_config().tg_bot.admin_ids:  # Замените check_condition на вашу проверку
-            print('ADMIN')  # как получить имя функции?
-            return func(message)
-    return wrapper
-
-
-@router.message(is_admin(F.text == 'Создание нового отложенного сообщения'))
+@router.message(F.text == 'Создание нового отложенного сообщения')
 async def new_post_press(message: Message):
     """admin_keyboard: клик 'Создание нового отложенного сообщения' """
-    pass
+    await message.reply(text='Создание нового отложенного сообщения')
 
 
-@router.message(is_admin(F.text == 'Указание категории для рассылки'))
+@router.message(F.text == 'Указание категории для рассылки')
 async def cat_new_post_press(message: Message):
     """admin_keyboard: клик 'Указание категории для рассылки' """
-    pass
+    await message.reply(text='Указание категории для рассылки')
 
 
-@router.message(is_admin(F.text == 'Указание времени для рассылки'))
+@router.message(F.text == 'Указание времени для рассылки')
 async def time_new_post_press(message: Message):
     """admin_keyboard: клик 'Указание времени для рассылки' """
-    pass
+    await message.reply(text='Указание времени для рассылки')
 
 
-@router.message(is_admin(F.text == 'Удаление сообщения'))
+@router.message(F.text == 'Удаление сообщения')
 async def delete_new_post_press(message: Message):
     """admin_keyboard: клик 'Удаление сообщения' """
     await message.reply(text='Удаление сообщения')
 
+
 select_cat_name = 0
-@router.message(is_admin(F.text == 'Добавить категорию'))
+@router.message(F.text == 'Добавить категорию')
 async def add_cat_press(message: Message):
     """admin_keyboard: клик 'Добавить категорию' """
     global select_cat_name
     await message.reply(text='Ведите название категории')
     select_cat_name = 1
 
-@router.message(is_admin(select_cat_name == 1))
+
+def is_select_cat_name_equal(mean) -> bool:
+    """Проверяет, равно ли значение select_cat_name 1."""
+    global select_cat_name
+    return select_cat_name == mean
+
+@router.message(lambda message: is_select_cat_name_equal(1))
 async def add_cat(message):
     global select_cat_name
 
-    db.add_category(name=message.text)
+    await add_category(name=message.text)
     await message.reply(text='Вы добавили новую категорию!')
 
     select_cat_name = 0
 
 
 select_subcat_name = 0
-@router.message(is_admin(F.text == 'Добавить подкатегорию'))
+@router.message(F.text == 'Добавить подкатегорию')
 async def add_subcat_press(message: Message):
     """admin_keyboard: клик 'Добавить подкатегорию' """
     global select_subcat_name
     await message.answer(text='Выберите категорию, в которую входит новая подкатегория',
-                         reply_markup=all_category_keyboard())
+                         reply_markup=await all_category_keyboard())
     select_subcat_name = 1
 
 cat_id = None
-@router.message(is_admin(lambda message: message.text[0] == '+'))
+@router.message(lambda message: message.text[0] == '+')
 async def add_cat(message):
-    db.get_cat_id_by_name(message.text.lstrip('+'))
+    global cat_id
+    cat_id = await get_cat_id_by_name(message.text.lstrip('+'))
     await message.reply(text='Ведите название подкатегории')
 
-@router.message(is_admin(lambda message: (select_subcat_name == 1) and (cat_id is not None)))
+def is_select_subcat_name_equal(mean) -> bool:
+    global select_subcat_name
+    return select_subcat_name == mean
+
+
+def is_cat_id_not_None() -> bool:
+    global cat_id
+    return cat_id is not None
+
+@router.message(lambda message: (is_select_subcat_name_equal(1)) and is_cat_id_not_None())
 async def add_cat(message):
     global select_subcat_name, cat_id
 
-    db.add_subcategory(parent_id=cat_id, name=message.text)
+    await add_subcategory(parent_id=cat_id['id'], name=message.text)
     await message.reply(text='Вы добавили новую подкатегорию!')
 
     select_subcat_name = 0
