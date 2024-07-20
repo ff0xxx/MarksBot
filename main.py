@@ -1,9 +1,11 @@
 import asyncio
 import logging
+import asyncpg
+from config_data.config import load_config
 from create_bot         import bot, dp, admins
-from db_handler.db_funk import create_tables
 from keyboards.set_menu import set_main_menu
 from handlers           import main_handlers, user_handlers, admin_handlers
+from middlewares.GatewayMiddleware import GatewayMiddleware
 from middlewares.admin_middleware import AdminMiddleware
 
 
@@ -27,7 +29,6 @@ async def stop_bot():
 
 
 async def main():
-
     logging.basicConfig(
         level=logging.INFO,
         format='%(filename)s:%(lineno)d #%(levelname)-8s [%(asctime)s] %(name)s %(message)s'
@@ -37,22 +38,30 @@ async def main():
     dp.startup.register(start_bot)
     dp.shutdown.register(stop_bot)
 
+    # Сначала добавляем мидлвары
+    admin_handlers.router.message.middleware(AdminMiddleware())
+    admin_handlers.router.callback_query.middleware(AdminMiddleware())
+
+    # Затем добавляем маршрутизаторы
     dp.include_router(main_handlers.router)
     dp.include_router(user_handlers.router)
     dp.include_router(admin_handlers.router)
 
-    admin_handlers.router.message.middleware(AdminMiddleware())
+    async with asyncpg.create_pool(dsn=load_config().tg_bot.dsn) as pool:
+        gateway_middleware = GatewayMiddleware(pool)
+        dp.message.middleware(gateway_middleware)
+        dp.callback_query.middleware(gateway_middleware)
 
-    try:
-        await bot.delete_webhook(drop_pending_updates=True)
-        logger.info('Starting bot')
-        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
-    finally:
-        await bot.session.close()
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info('Starting bot')
+            await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        finally:
+            await bot.session.close()
+
 
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    asyncio.run(create_tables())
     asyncio.run(main())
-
+    

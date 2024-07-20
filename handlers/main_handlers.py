@@ -4,17 +4,19 @@ from aiogram.types          import Message
 from config_data.config     import load_config
 from keyboards.keyboards    import admin_keyboard, user_keyboard
 from lexicon.lexicon_ru     import LEXICON_RU
-from db_handler.db_funk     import add_user
+from db_handler.db_funk     import UserGateway
 
 router: Router = Router()
 
 
 @router.message(Command(commands=['start']))
-async def process_start_command(message: Message):
+async def process_start_command(message: Message, user_gateway: UserGateway):
     """ХЭНДЛЕР ДЛЯ ОБРАБОТКИ КОМАНДЫ '\\start'"""
 
+    await user_gateway.create_tables()
+
     user_id = message.from_user.id
-    await add_user(user_id)
+    await user_gateway.add_user(user_id)
 
     if user_id in load_config().tg_bot.admin_ids:  # зач запись админа в бд? хотя мб его понизят и ..?
         await message.answer(
