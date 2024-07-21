@@ -121,51 +121,78 @@ class UserGateway:
             name
         )
 
-    async def get_all_categories(self):
-        # Получаем все категории, а не подкатегории
+    async def get_all_categories(self, with_subcategories=False):
+        if not with_subcategories:
+            # Получаем все категории
+            return await self._connect.fetch(
+                'SELECT id, name FROM categories WHERE level = 1'
+            )
+        else:
+            # Получаем все категории и подкатегории
+            return await self._connect.fetch(
+                '''
+                SELECT id, name 
+                FROM categories c1 
+                WHERE level = 1 
+                AND EXISTS (
+                    SELECT 1 
+                    FROM categories c2 
+                    WHERE c2.parent_id = c1.id
+                )
+                '''
+            )
+
+    async def get_subcats_by_cat_id(self, cat_id):
+        # Получаем все подкатегории
         return await self._connect.fetch(
-            'SELECT id, name FROM categories WHERE level = 1'
+            """
+            SELECT id, name
+            FROM categories 
+            WHERE level = 2 
+            AND parent_id = $1
+            """,
+            cat_id
         )
 
-    async def get_categories_by_user_id(self, user_id):
+    async def get_all_subcategories_by_user_id(self, user_id):
         # Получаем категории по id пользователя
+        return await self._connect.fetch(
+            """
+            SELECT c.id, c.name, c.level
+            FROM Subscriptions s
+            JOIN categories c ON s.category_id = c.id
+            WHERE s.user_id = $1
+            AND level = 2
+            """,
+            user_id
+        )
+
+    async def get_subcategories_by_user_id(self, user_id):
+        # Получаем подкатегории по id пользователя
         return await self._connect.fetch(
             """
             SELECT c.id, c.name
             FROM Subscriptions s
             JOIN categories c ON s.category_id = c.id
             WHERE s.user_id = $1
+            AND level = 2
             """,
             user_id
         )
 
-    async def unsubscribe_user_from_category(self, user_id, category_name):
-        # Получаем id категории по ее названию
-        category_id_row = await self._connect.fetchrow(
-            'SELECT id FROM categories WHERE name = $1',
-            category_name
+    async def unsubscribe_user_from_category_by_id(self, user_id, cat_id):
+        # Удаляем запись из таблицы Subscriptions
+        await self._connect.execute(
+            'DELETE FROM Subscriptions WHERE user_id = $1 AND category_id = $2',
+            user_id, cat_id
         )
-        if category_id_row:
-            category_id = category_id_row['id']
-            # Удаляем запись из таблицы Subscriptions
-            await self._connect.execute(
-                'DELETE FROM Subscriptions WHERE user_id = $1 AND category_id = $2',
-                user_id, category_id
-            )
 
-    async def subscribe_user_to_category(self, user_id, category_name):
-        # Получаем id категории по ее названию
-        category_id_row = await self._connect.fetchrow(
-            'SELECT id FROM categories WHERE name = $1',
-            category_name
+    async def subscribe_user_to_category_by_id(self, user_id, cat_id):
+        # Добавляем запись в таблицу Subscriptions
+        await self._connect.execute(
+            'INSERT INTO Subscriptions (user_id, category_id) VALUES ($1, $2)',
+            user_id, cat_id
         )
-        if category_id_row:
-            category_id = category_id_row['id']
-            # Добавляем запись в таблицу Subscriptions
-            await self._connect.execute(
-                'INSERT INTO Subscriptions (user_id, category_id) VALUES ($1, $2)',
-                user_id, category_id
-            )
 
     ##### POSTS
 

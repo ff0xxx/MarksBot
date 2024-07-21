@@ -1,6 +1,6 @@
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton
+from aiogram.types          import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
-from db_handler.db_funk import UserGateway
+from db_handler.db_funk     import UserGateway
 
 
 #####
@@ -36,21 +36,56 @@ admin_keyboard = ReplyKeyboardMarkup(
 #####
 
 async def category_keyboard(user_id, user_gateway: UserGateway) -> ReplyKeyboardMarkup:
-    cat_list = await user_gateway.get_all_categories()
-    user_cat_list = await user_gateway.get_categories_by_user_id(user_id)
+    """INLINE-КЛАВИАТУРА ДЛЯ ПОДПИСОК: КАТЕГОРИИ"""
+    cat_list = await user_gateway.get_all_categories(with_subcategories=True)
+    user_subcats = await user_gateway.get_all_subcategories_by_user_id(user_id=user_id) # верно
+    user_subcats_list = [sub['id'] for sub in user_subcats]
+
+    buttons = []
+    for cat in cat_list:
+        cat_id = await user_gateway.get_cat_id_by_name(name=cat[1])
+        cat_subcats = await user_gateway.get_subcats_by_cat_id(cat_id=int(cat_id['id'])) # верно
+        cat_subcats_list = [sub['id'] for sub in cat_subcats]
+
+        # если пересечения со всеми subcats у subcats текущей подкатегории
+        if set(user_subcats_list) & set(cat_subcats_list):
+            cat_name = cat[1] + '✅'
+        else:
+            cat_name = cat[1] + '❌'
+
+        button = InlineKeyboardButton(text=cat_name,
+                                      callback_data='cat' + str(cat_id['id']))
+        buttons.append(button)
+
+    builder = InlineKeyboardBuilder().row(*buttons, width=3)
+
+    return builder.as_markup()
+
+
+#####
+
+async def subcategory_keyboard(user_id, cat_id, user_gateway: UserGateway) -> ReplyKeyboardMarkup:
+    """INLINE-КЛАВИАТУРА ДЛЯ ПОДПИСОК: ПОДКАТЕГОРИИ"""
+    subcat_list = await user_gateway.get_subcats_by_cat_id(cat_id)
+    user_subcat_list = await user_gateway.get_subcategories_by_user_id(user_id)
 
     buttons = []
 
-    for cat in cat_list:
-        if cat in user_cat_list:
-            button_text = f'{cat[1]}✅'
+    for subcat in subcat_list:
+        if subcat in user_subcat_list:
+            sign = '✅'
         else:
-            button_text = f'{cat[1]}❌'
-        buttons.append(KeyboardButton(text=button_text))
+            sign = '❌'
 
-    kb_builder = ReplyKeyboardBuilder()
-    kb_builder.row(*buttons, width=3)
-    return kb_builder.as_markup(resize_keyboard=True)
+        subcat_name = subcat[1] + sign
+
+        button = InlineKeyboardButton(text=subcat_name,
+                                      callback_data=f"sub {str(subcat['id'])} {cat_id} {sign}")
+        buttons.append(button)
+
+    builder = InlineKeyboardBuilder().row(*buttons, width=3)
+
+    return builder.as_markup()
 
 
 #####
@@ -69,6 +104,8 @@ async def plus_category_keyboard(user_gateway: UserGateway) -> ReplyKeyboardMark
     return kb_builder.as_markup(resize_keyboard=True,
                                 one_time_keyboard=True)
 
+
+#####
 
 async def minus_category_keyboard(user_gateway: UserGateway) -> ReplyKeyboardMarkup:
     """INLINE-КЛАВИАТУРА ДЛЯ УДАЛЕНИЯ КАТЕГОРИЙ"""
