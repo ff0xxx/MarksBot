@@ -14,11 +14,7 @@ class AdminMiddleware(BaseMiddleware):
         # Проверяем, является ли пользователь администратором
         if event.from_user.id in load_config().tg_bot.admin_ids:
             result = await handler(event, data)  # Используем await для асинхронного вызова
-            print('ADMINNN')
             return result
         else:
-            # Если не администратор
-            # print('USERRR')
-            # return await handler(event, data)
             await event.answer(text=LEXICON_RU['echo'])
             return None

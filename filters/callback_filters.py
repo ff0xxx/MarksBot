@@ -24,3 +24,18 @@ class SelectSubcategoryCallbackData(BaseFilter):
             return callback.data.split()[0] == 'sub'
         except:
             return False
+
+class SelectPostCatCallbackData(BaseFilter):
+    async def __call__(self, callback: CallbackQuery):
+        try:
+            return callback.data.split()[0] == 'post_cat'
+        except:
+            return False
+
+
+class SelectPostSubcatCallbackData(BaseFilter):
+    async def __call__(self, callback: CallbackQuery):
+        try:
+            return callback.data.split()[0] == 'post_sub'
+        except:
+            return False

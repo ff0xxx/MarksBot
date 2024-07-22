@@ -1,7 +1,7 @@
 from aiogram                import Router, F
 from aiogram.types          import CallbackQuery
 from db_handler.db_funk     import UserGateway
-from filters.filters        import SelectCategoryCallbackData, SelectSubcategoryCallbackData
+from filters.callback_filters        import SelectCategoryCallbackData, SelectSubcategoryCallbackData
 from keyboards.keyboards    import category_keyboard, subcategory_keyboard
 from lexicon.lexicon_ru     import LEXICON_RU
 

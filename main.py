@@ -1,12 +1,12 @@
 import asyncio
 import logging
 import asyncpg
-from config_data.config import load_config
-from create_bot         import bot, dp, admins
-from keyboards.set_menu import set_main_menu
-from handlers           import main_handlers, user_handlers, admin_handlers
-from middlewares.GatewayMiddleware import GatewayMiddleware
-from middlewares.admin_middleware import AdminMiddleware
+from config_data.config             import load_config
+from create_bot                     import bot, dp, admins
+from keyboards.set_menu             import set_main_menu
+from handlers                       import main_handlers, user_handlers, admin_handlers
+from middlewares.GatewayMiddleware  import GatewayMiddleware
+from middlewares.admin_middleware   import AdminMiddleware
 
 
 # Функция, которая выполнится когда бот запустится

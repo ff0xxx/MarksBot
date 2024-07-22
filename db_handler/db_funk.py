@@ -1,5 +1,5 @@
-import asyncpg
-import asyncio
+from datetime   import datetime
+from create_bot import bot
 
 
 class UserGateway:
@@ -32,10 +32,10 @@ class UserGateway:
                 id SERIAL PRIMARY KEY,
                 content TEXT,
                 category_id BIGINT,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                scheduled_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
-                CHECK (scheduled_at >= created_at)
+                created_at TIMESTAMP NOT NULL,
+                scheduled_at TIMESTAMP NOT NULL,
+                is_published BOOLEAN DEFAULT FALSE, 
+                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT ON UPDATE RESTRICT
             )
         """)
 
@@ -82,9 +82,10 @@ class UserGateway:
     async def add_post(self, content, category_id, scheduled_at):
         # Вставляем новый пост
         await self._connect.execute(
-            "INSERT INTO Posts (content, category_id, scheduled_at) VALUES ($1, $2, $3)",
+            "INSERT INTO Posts (content, category_id, created_at, scheduled_at) VALUES ($1, $2, $3, $4)",
             content,
             category_id,
+            datetime.now(),
             scheduled_at  # scheduled_at должен быть типа datetime
         )
 
@@ -110,6 +111,10 @@ class UserGateway:
             "DELETE FROM categories WHERE id = $1",
             cat_id
         )
+
+    async def delete_post(self, post: int):
+        """сначала напиши высылание архива и уже похоже на это будет тут"""
+        pass
 
 
     ##### CATEGORY
@@ -196,7 +201,60 @@ class UserGateway:
 
     ##### POSTS
 
-    # - get_scheduled_posts
+    async def get_subscribers_for_post(self, post_id):
+        """Возвращает список user_ids которые должны получить данный пост"""
+        user_ids = await self._connect.fetch(
+            """
+            SELECT u.user_id
+            FROM subscriptions s
+            JOIN users u ON s.user_id = u.user_id
+            WHERE s.category_id = (
+              SELECT category_id 
+              FROM posts
+              WHERE id = $1
+            );
+            """,
+            post_id
+        )
 
-    # - get_subscribed_posts ДАВАЙ ТИПО ЕЩЕ СПРАШИВАТЬ СКОЛЬКО ПОСЛЕДНИХ ПУБЛИКАЦИЙ ТЕБЕ
-    # и т.д.
+        return user_ids
+
+    async def check_scheduled_posts(self):
+        """Возвращает посты, scheduled_at которых наступило"""
+        scheduled_posts = await self._connect.fetch(
+            """
+            SELECT id, content, category_id, scheduled_at
+            FROM posts
+            WHERE scheduled_at <= NOW() AND is_published = FALSE;
+            """
+        )
+
+        return scheduled_posts
+
+    async def send_post_to_subscribers(self, scheduled_posts):
+        """Отправляет посты, scheduled_at которых наступило, всем кому нужно"""
+        for post in scheduled_posts:
+            post_id = post['id']
+            post_content = post['content']
+            category_id = post['category_id']
+
+            user_ids = await self.get_subscribers_for_post(post_id)
+
+            # Отправляем сообщение каждому подписчику
+            for user in user_ids:
+                await bot.send_message(chat_id=user['user_id'], text=post_content)
+
+            # Обновляем статус поста на выложенный
+            await self._connect.execute(
+                """
+                UPDATE posts
+                SET is_published = TRUE
+                WHERE id = $1;
+                """,
+                post_id
+            )
+
+
+    # - Архив
+
+    # - Удалить пост
