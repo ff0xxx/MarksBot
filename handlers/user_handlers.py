@@ -1,10 +1,15 @@
-from aiogram                import Router, F
-from aiogram.types          import CallbackQuery
-from db_handler.db_funk     import UserGateway
-from filters.callback_filters        import SelectCategoryCallbackData, SelectSubcategoryCallbackData
-from keyboards.keyboards    import category_keyboard, subcategory_keyboard
-from lexicon.lexicon_ru     import LEXICON_RU
-
+from aiogram                    import Router, F
+from aiogram.filters            import StateFilter
+from aiogram.fsm.context        import FSMContext
+from aiogram.types              import CallbackQuery
+from db_handler.db_funk         import UserGateway
+from filters.callback_filters   import (SelectCategoryCallbackData, SelectSubcategoryCallbackData,
+                                        SelectPostCatCallbackData, SelectPostSubcatCallbackData)
+from filters.message_filters    import IsCorrectArchiveCount
+from keyboards.keyboards        import (category_keyboard, subcategory_keyboard,
+                                        add_post_category_keyboard, add_post_subcategory_keyboard)
+from lexicon.lexicon_ru         import LEXICON_RU
+from states.my_states           import FSMArchive
 
 router: Router = Router()
 
@@ -47,10 +52,51 @@ async def change_subcategory_kb(callback: CallbackQuery, user_gateway: UserGatew
                                                                                  user_gateway=user_gateway))
 
 
+##### ARCHIVE
+
 @router.message(F.text == 'Архив')
-async def send_archive(message):
+async def archive_press(message, state: FSMContext, user_gateway: UserGateway):
     """user_keyboard: клик 'Архив' """
-    await message.reply(text='Выслали последние 10 записей из ваших категорий')
+    await message.answer(text='Архив какой категории вас интересует?',
+                         reply_markup=await add_post_category_keyboard(user_gateway))
+    await state.set_state(FSMArchive.select_archive_cat)
+
+
+@router.callback_query(StateFilter(FSMArchive.select_archive_cat), SelectPostCatCallbackData())
+async def get_archive_cat(callback, state: FSMContext, user_gateway: UserGateway):
+    cat_id = int(callback.data.split()[1])
+    await callback.message.edit_text(text='Конктретнее: архив какой <b>подкатегории</b> вас интересует?',
+                                     reply_markup=await add_post_subcategory_keyboard(cat_id, user_gateway))
+    await state.set_state(FSMArchive.select_archive_subcat)
+
+
+@router.callback_query(StateFilter(FSMArchive.select_archive_subcat), SelectPostSubcatCallbackData())
+async def get_archive_subcat(callback, state: FSMContext, user_gateway: UserGateway):
+    subcat_id = int(callback.data.split()[1])
+    await state.update_data(subcat_id=subcat_id)
+    await callback.message.delete()
+    await callback.message.answer(text='Введите количество последних записей, которые хотите увидеть\n'
+                                       'Максимальное количество - 5')
+    await state.set_state(FSMArchive.fill_archive_deep)
+
+
+@router.message(StateFilter(FSMArchive.fill_archive_deep), IsCorrectArchiveCount())
+async def correct_send_archive(message, state: FSMContext, user_gateway: UserGateway):
+    user_id = int(message.from_user.id)
+    count = int(message.text)
+    data = await state.get_data()
+    subcat_id = int(data['subcat_id'])
+
+    posts = await user_gateway.get_archive_posts(subcat_id, count)
+    await message.answer(text=f'Вам будет предоставлено {len(posts)} из {count} постов:')
+    await user_gateway.send_archive(posts, user_id)
+
+    await state.clear()
+
+
+@router.message(StateFilter(FSMArchive.fill_archive_deep))
+async def incorrect_send_archive(message):
+    await message.reply('Пожалуйста, введите число до 5.')
 
 
 @router.message(F.text == 'Обо мне')

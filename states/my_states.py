@@ -10,3 +10,9 @@ class FSMAddCut(StatesGroup):
     select_cat_name = State()
     select_cat_for_subcat = State()
     select_subcat_name = State()
+
+
+class FSMArchive(StatesGroup):
+    select_archive_cat = State()
+    select_archive_subcat = State()
+    fill_archive_deep = State()

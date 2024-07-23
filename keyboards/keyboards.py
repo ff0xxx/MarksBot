@@ -25,13 +25,14 @@ async def admin_keyboard():
     button_3 = KeyboardButton(text='Добавить категорию')
     button_4 = KeyboardButton(text='Добавить подкатегорию')
     button_5 = KeyboardButton(text='Удалить категорию')
-    button_6 = KeyboardButton(text='Выбрать категории')
+    button_6 = KeyboardButton(text='Архив')
+    button_7 = KeyboardButton(text='Выбрать категории')
 
     admin_kb = ReplyKeyboardMarkup(
         keyboard=[[button_1, button_2],
                   [button_3, button_4],
-                  [button_5],
-                  [button_6]],
+                  [button_5, button_6],
+                  [button_7]],
         resize_keyboard=True)
 
     return admin_kb
@@ -134,22 +135,12 @@ async def minus_category_keyboard(user_gateway: UserGateway) -> InlineKeyboardMa
 async def add_post_category_keyboard(user_gateway: UserGateway) -> InlineKeyboardMarkup:
     """INLINE-КЛАВИАТУРА ДЛЯ ВЫБОРА КАТЕГОРИИ ПОСТА"""
     cat_list = await user_gateway.get_all_categories(with_subcategories=True)
-    # user_subcats = await user_gateway.get_all_subcategories_by_user_id(user_id=user_id) # верно
-    # user_subcats_list = [sub['id'] for sub in user_subcats]
 
     buttons = []
 
     for cat in cat_list:
         cat_name = cat[1]
         cat_id = await user_gateway.get_cat_id_by_name(name=cat_name)
-        # cat_subcats = await user_gateway.get_subcats_by_cat_id(cat_id=int(cat_id['id'])) # верно
-        # cat_subcats_list = [sub['id'] for sub in cat_subcats]
-
-        # # если пересечения со всеми subcats у subcats текущей подкатегории
-        # if set(user_subcats_list) & set(cat_subcats_list):
-        #     cat_name = cat[1] + '✅'
-        # else:
-        #     cat_name = cat[1] + '❌'
 
         button = InlineKeyboardButton(text=cat_name,
                                       callback_data=f"post_cat {str(cat_id['id'])}")
@@ -165,16 +156,10 @@ async def add_post_category_keyboard(user_gateway: UserGateway) -> InlineKeyboar
 async def add_post_subcategory_keyboard(cat_id, user_gateway: UserGateway) -> InlineKeyboardMarkup:
     """INLINE-КЛАВИАТУРА ВЫБОРА ПОДКАТЕГОРИИ ПОСТА"""
     subcat_list = await user_gateway.get_subcats_by_cat_id(cat_id)
-    # user_subcat_list = await user_gateway.get_subcategories_by_user_id(user_id)
 
     buttons = []
 
     for subcat in subcat_list:
-        # if subcat in user_subcat_list:
-        #     sign = '✅'
-        # else:
-        #     sign = '❌'
-
         subcat_name = subcat[1]  #+ sign
         subcat_id = subcat['id']
 

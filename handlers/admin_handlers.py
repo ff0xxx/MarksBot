@@ -66,9 +66,8 @@ async def post_time_press(callback: CallbackQuery, state: FSMContext, user_gatew
                                     content=post_data['post_content'],
                                     scheduled_at=post_data['post_sheduled_at'])
 
-        await callback.message.edit_text(text='Отлично, вы добавили пост в базу данных!\n'
-                                              'Он выйдет в назначенное вами время',
-                                         reply_markup=await admin_keyboard())
+        await callback.message.answer(text='Отлично, вы добавили пост в базу данных!\n'
+                                           'Он выйдет в назначенное вами время')
 
     elif callback.data == 'somewhen':
         await callback.message.answer(text='Введите свое время выхода поста в формате:\n'
@@ -154,7 +153,7 @@ async def add_subcat_press(message, state: FSMContext, user_gateway: UserGateway
     await state.set_state(FSMAddCut.select_cat_for_subcat)
 
 
-@router.message(lambda message: message.text[0] == '+', StateFilter(FSMAddCut.select_cat_for_subcat))
+@router.message(StateFilter(FSMAddCut.select_cat_for_subcat), lambda message: message.text[0] == '+')
 async def add_cat(message, state: FSMContext, user_gateway: UserGateway):
     cat_id = await user_gateway.get_cat_id_by_name(message.text.lstrip('+'))
     await state.update_data(cat_id=int(cat_id['id']))

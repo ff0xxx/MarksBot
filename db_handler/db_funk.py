@@ -254,7 +254,27 @@ class UserGateway:
                 post_id
             )
 
-
-    # - Архив
-
     # - Удалить пост
+
+    async def get_archive_posts(self, cat_id, count: int):
+        # ИЗМЕНИ ТУТ FALSE НА TRUE !!!!!!!!!!!!!!!!!
+        # @!!!!!!!!!!!!@!!!!!!!!!!!!!!!
+        # @@@@@@@@@@@@@@@@@@@@@@@@@!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        posts = await self._connect.fetch(
+            """
+            SELECT id, content, category_id
+            FROM posts
+            WHERE category_id = $1
+            AND is_published = FALSE
+            ORDER BY created_at DESC 
+            LIMIT $2
+            """,
+            cat_id,
+            count
+        )
+        return posts
+
+    async def send_archive(self, posts, user_id):
+        for post in posts:
+            post_content = post['content']
+            await bot.send_message(chat_id=user_id, text=post_content)

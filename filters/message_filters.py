@@ -13,7 +13,6 @@ class IsCorrectPostTime(BaseFilter):
             user_date = datetime.strptime(user_input, date_format)
         except ValueError:
             # Если формат неверный, возвращаем False
-            print(ValueError)
             return False
 
         # Получаем текущее время
@@ -21,3 +20,13 @@ class IsCorrectPostTime(BaseFilter):
 
         # Проверяем, что введенная дата больше текущей
         return user_date > current_time
+
+
+class IsCorrectArchiveCount(BaseFilter):
+    async def __call__(self, message: Message) -> bool:
+        try:
+            count = int(message.text)
+        except ValueError:
+            return False
+
+        return count <= 5
