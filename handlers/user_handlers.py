@@ -13,12 +13,20 @@ from states.my_states           import FSMArchive
 
 router: Router = Router()
 
-
+@router.callback_query(F.data == 'go_back')
+async def select_category(callback,  user_gateway: UserGateway):
+    """category_keyboard: клик 'Назад' """
+    user_id = callback.from_user.id
+    await callback.message.edit_text(text='Выберите категории',
+                                     reply_markup=await category_keyboard(user_id=user_id, user_gateway=user_gateway))
 @router.message(F.text == 'Выбрать категории')
 async def select_category(message,  user_gateway: UserGateway):
     """user_keyboard: клик 'Выбрать категории' """
     await message.answer(text='Выберите категории',
                          reply_markup=await category_keyboard(user_id=message.from_user.id, user_gateway=user_gateway))
+
+
+
 
 
 @router.callback_query(SelectCategoryCallbackData())
@@ -29,6 +37,7 @@ async def select_subcategory(callback: CallbackQuery, user_gateway: UserGateway)
                                                                              cat_id=int(callback.data[3:]),
                                                                              user_gateway=user_gateway)
                                      )
+
 
 @router.callback_query(SelectSubcategoryCallbackData())
 async def change_subcategory_kb(callback: CallbackQuery, user_gateway: UserGateway):

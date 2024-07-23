@@ -4,11 +4,11 @@ from aiogram.fsm.context            import FSMContext
 from aiogram.types                  import CallbackQuery
 from db_handler.db_funk             import UserGateway
 from filters.callback_filters       import IsDeleteCatCallbackData, SelectPostCatCallbackData, SelectPostSubcatCallbackData
-from filters.message_filters        import IsCorrectPostTime
+from filters.message_filters import IsCorrectPostTime, IsCorrectPostId
 from keyboards.keyboards            import plus_category_keyboard, minus_category_keyboard, add_post_category_keyboard, \
     add_post_subcategory_keyboard, post_time_keyboard, admin_keyboard
 from lexicon.lexicon_ru             import LEXICON_RU
-from states.my_states               import FSMFillForm, FSMAddCut
+from states.my_states import FSMFillForm, FSMAddCut, FSMPostDelete
 from datetime                       import datetime
 
 router: Router = Router()
@@ -69,6 +69,8 @@ async def post_time_press(callback: CallbackQuery, state: FSMContext, user_gatew
         await callback.message.answer(text='Отлично, вы добавили пост в базу данных!\n'
                                            'Он выйдет в назначенное вами время')
 
+        await state.clear()
+
     elif callback.data == 'somewhen':
         await callback.message.answer(text='Введите свое время выхода поста в формате:\n'
                                            'YYYY:MM:DD hh:mm\n\n'
@@ -102,12 +104,34 @@ async def post_correct_time_sent(message, state: FSMContext, user_gateway: UserG
 async def post_incorrect_time_sent(message, state: FSMContext, user_gateway: UserGateway):
     """Если ввели некорректное время"""
     await message.answer(text='Введите корректное время.')
+    print(state.get_state())
 
 
 @router.message(F.text == 'Удалить пост')
-async def delete_new_post_press(message):
-    """admin_keyboard: клик 'Удалить пост' """
-    await message.reply(text='Удалить пост')
+async def delete_new_post_press(message, state: FSMContext):
+    """admin_keyboard: клик 'Удалить пост' (можно удалить только последние 5 из подкатегории)"""
+    await message.reply(text='Введите <i>id</i> поста. Например: 8\n'
+                             'Его можно получить посмотрев архиве.\n'
+                             '<tg-spoiler>Можно удалить только последние 5 постов из каждой подкатегории</tg-spoiler>')
+    await state.set_state(FSMPostDelete.fill_delete_post_id)
+
+
+@router.message(StateFilter(FSMPostDelete.fill_delete_post_id), IsCorrectPostId())
+async def correct_delete_post_id(message, state: FSMContext, user_gateway: UserGateway):
+    post_id = int(message.text)
+    flag = await user_gateway.is_post_exist(post_id)
+
+    if flag:
+        await user_gateway.delete_post(post_id)
+        await message.answer(text='Вы успешно удалили пост')
+        await state.clear()
+    else:
+        await message.answer(text='Введите <i>id</i> существующего поста.')
+
+
+@router.message(StateFilter(FSMPostDelete.fill_delete_post_id))
+async def incorrect_delete_post_id(message):
+    await message.answer(text='Введите правильное <i>id</i> поста')
 
 
 ##### КАТЕГОРИИ

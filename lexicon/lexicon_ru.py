@@ -5,7 +5,11 @@ LEXICON_RU: dict[str: str] = {
 
     '/about': 'Marks 19 y.o',
 
-    '/help': 'Помощь пользователю',
+    '/help': """
+             /menu - Открыть меню
+             /cancel - Прервать команду
+             /about - О заказчике
+             """,
 
     'echo': 'Я тебя не понимаю.',
 
@@ -13,6 +17,8 @@ LEXICON_RU: dict[str: str] = {
 
 LEXICON_COMMANDS = {
     '/menu': 'Открыть меню',
+
+    '/cancel': 'Прервать команду',
 
     '/about': 'О закачике',
 

@@ -16,3 +16,7 @@ class FSMArchive(StatesGroup):
     select_archive_cat = State()
     select_archive_subcat = State()
     fill_archive_deep = State()
+
+
+class FSMPostDelete(StatesGroup):
+    fill_delete_post_id = State()

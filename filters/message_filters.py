@@ -30,3 +30,12 @@ class IsCorrectArchiveCount(BaseFilter):
             return False
 
         return count <= 5
+
+
+class IsCorrectPostId(BaseFilter):
+    async def __call__(self, message: Message) -> bool:
+        try:
+            int(message.text)
+        except ValueError:
+            return False
+        return True

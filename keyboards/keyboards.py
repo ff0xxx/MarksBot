@@ -25,8 +25,8 @@ async def admin_keyboard():
     button_3 = KeyboardButton(text='Добавить категорию')
     button_4 = KeyboardButton(text='Добавить подкатегорию')
     button_5 = KeyboardButton(text='Удалить категорию')
-    button_6 = KeyboardButton(text='Архив')
-    button_7 = KeyboardButton(text='Выбрать категории')
+    button_6 = KeyboardButton(text='Выбрать категории')
+    button_7 = KeyboardButton(text='Архив')
 
     admin_kb = ReplyKeyboardMarkup(
         keyboard=[[button_1, button_2],
@@ -43,13 +43,13 @@ async def admin_keyboard():
 async def category_keyboard(user_id, user_gateway: UserGateway) -> InlineKeyboardMarkup:
     """INLINE-КЛАВИАТУРА ДЛЯ ПОДПИСОК: КАТЕГОРИИ"""
     cat_list = await user_gateway.get_all_categories(with_subcategories=True)
-    user_subcats = await user_gateway.get_all_subcategories_by_user_id(user_id=user_id) # верно
+    user_subcats = await user_gateway.get_all_subcategories_by_user_id(user_id=user_id)
     user_subcats_list = [sub['id'] for sub in user_subcats]
 
     buttons = []
     for cat in cat_list:
         cat_id = await user_gateway.get_cat_id_by_name(name=cat[1])
-        cat_subcats = await user_gateway.get_subcats_by_cat_id(cat_id=int(cat_id['id'])) # верно
+        cat_subcats = await user_gateway.get_subcats_by_cat_id(cat_id=int(cat_id['id']))
         cat_subcats_list = [sub['id'] for sub in cat_subcats]
 
         # если пересечения со всеми subcats у subcats текущей подкатегории
@@ -88,7 +88,11 @@ async def subcategory_keyboard(user_id, cat_id, user_gateway: UserGateway) -> In
                                       callback_data=f"sub {str(subcat['id'])} {cat_id} {sign}")
         buttons.append(button)
 
+    back_button = InlineKeyboardButton(text='Назад',
+                                       callback_data='go_back')
+
     builder = InlineKeyboardBuilder().row(*buttons, width=3)
+    builder.row(back_button, width=1)
 
     return builder.as_markup()
 

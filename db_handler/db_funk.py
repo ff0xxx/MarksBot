@@ -1,4 +1,6 @@
 from datetime   import datetime
+
+from config_data.config import load_config
 from create_bot import bot
 
 
@@ -35,7 +37,7 @@ class UserGateway:
                 created_at TIMESTAMP NOT NULL,
                 scheduled_at TIMESTAMP NOT NULL,
                 is_published BOOLEAN DEFAULT FALSE, 
-                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT ON UPDATE RESTRICT
+                FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE ON UPDATE RESTRICT
             )
         """)
 
@@ -112,9 +114,11 @@ class UserGateway:
             cat_id
         )
 
-    async def delete_post(self, post: int):
-        """сначала напиши высылание архива и уже похоже на это будет тут"""
-        pass
+    async def delete_post(self, post_id):
+        await self._connect.execute(
+            "DELETE FROM posts WHERE id = $1",
+            post_id
+        )
 
 
     ##### CATEGORY
@@ -276,5 +280,26 @@ class UserGateway:
 
     async def send_archive(self, posts, user_id):
         for post in posts:
+            post_id = post['id']
             post_content = post['content']
+
+            if user_id in load_config().tg_bot.admin_ids:
+                await bot.send_message(chat_id=user_id, text=f'<i>id: {post_id}</i>')
             await bot.send_message(chat_id=user_id, text=post_content)
+
+    async def is_post_exist(self, post_id):
+        """Возвращает True, если пост существует, и False в противном случае"""
+        result = await self._connect.fetchval(
+            """
+            SELECT EXISTS(
+              SELECT 1
+              FROM posts
+              WHERE id = $1  
+            ) AS post_exists;
+            """,
+            post_id
+        )
+
+        return result
+
+

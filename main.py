@@ -14,7 +14,8 @@ async def start_bot():
     await set_main_menu(bot)
     try:
         for admin_id in admins:
-            await bot.send_message(admin_id, f'Бот запущен')
+            await bot.send_message(admin_id, f'Бот запущен\n'
+                                             f'На всякий случай отправьте /start')
     except:
         pass
 
