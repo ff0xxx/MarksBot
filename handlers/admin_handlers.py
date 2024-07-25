@@ -1,15 +1,17 @@
-from aiogram                        import Router, F
+from aiogram                        import Router, F, Bot
 from aiogram.filters                import StateFilter
 from aiogram.fsm.context            import FSMContext
 from aiogram.types                  import CallbackQuery
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from db_handler.db_funk             import UserGateway
 from filters.callback_filters       import IsDeleteCatCallbackData, SelectPostCatCallbackData, SelectPostSubcatCallbackData
-from filters.message_filters import IsCorrectPostTime, IsCorrectPostId
-from keyboards.keyboards            import plus_category_keyboard, minus_category_keyboard, add_post_category_keyboard, \
-    add_post_subcategory_keyboard, post_time_keyboard, admin_keyboard
+from filters.message_filters        import IsCorrectPostTime, IsCorrectPostId
 from lexicon.lexicon_ru             import LEXICON_RU
-from states.my_states import FSMFillForm, FSMAddCut, FSMPostDelete
+from keyboards.keyboards            import (plus_category_keyboard, minus_category_keyboard, add_post_category_keyboard,
+                                            add_post_subcategory_keyboard, post_time_keyboard, admin_keyboard)
+from states.my_states               import FSMFillForm, FSMAddCut, FSMPostDelete
 from datetime                       import datetime
+from handlers.apsched_func               import send_post_to_subscribers
 
 router: Router = Router()
 
@@ -44,7 +46,8 @@ async def subcat_new_post_press(callback: CallbackQuery, state: FSMContext, user
 
 @router.message(StateFilter(FSMFillForm.fill_post_content))
 async def post_content_sent(message, state: FSMContext, user_gateway: UserGateway):
-    # Cохраняем введенное имя в хранилище по ключу "content"
+
+    # Cохраняем введенный content в хранилище по ключу "content"
     await state.update_data(post_content=message.text)
 
     await message.answer(text='Теперь введите время публикации поста',
@@ -53,7 +56,8 @@ async def post_content_sent(message, state: FSMContext, user_gateway: UserGatewa
 
 
 @router.callback_query(StateFilter(FSMFillForm.fill_post_sheduled_at), F.data.in_(['now', 'somewhen']))
-async def post_time_press(callback: CallbackQuery, state: FSMContext, user_gateway: UserGateway):
+async def post_time_press(callback: CallbackQuery, state: FSMContext, user_gateway: UserGateway,
+                          apscheduler: AsyncIOScheduler, bot: Bot):
     await callback.message.delete()
 
     if callback.data == 'now':
@@ -62,14 +66,21 @@ async def post_time_press(callback: CallbackQuery, state: FSMContext, user_gatew
 
         # Добавляем это в бд, ибо данных достаточно
         post_data = await state.get_data()
-        await user_gateway.add_post(category_id=post_data['post_subcat_id'],
-                                    content=post_data['post_content'],
-                                    scheduled_at=post_data['post_sheduled_at'])
+        content = post_data['post_content']
+        scheduled_at = post_data['post_sheduled_at']
+        post_id = await user_gateway.add_post(category_id=post_data['post_subcat_id'],
+                                              content=content,
+                                              scheduled_at=scheduled_at)
 
         await callback.message.answer(text='Отлично, вы добавили пост в базу данных!\n'
                                            'Он выйдет в назначенное вами время')
 
         await state.clear()
+
+        apscheduler.add_job(send_post_to_subscribers, trigger='date', run_date=scheduled_at,
+                            kwargs={'bot': bot, 'post_id': post_id, 'post_content': content})
+
+        await user_gateway.upload_post_status(post_id=post_id)
 
     elif callback.data == 'somewhen':
         await callback.message.answer(text='Введите свое время выхода поста в формате:\n'
@@ -78,7 +89,8 @@ async def post_time_press(callback: CallbackQuery, state: FSMContext, user_gatew
 
 
 @router.message(StateFilter(FSMFillForm.fill_post_sheduled_at), IsCorrectPostTime())
-async def post_correct_time_sent(message, state: FSMContext, user_gateway: UserGateway):
+async def post_correct_time_sent(message, state: FSMContext, user_gateway: UserGateway,
+                                 apscheduler: AsyncIOScheduler, bot: Bot):
     """Если ввели корректное время"""
     time: str = message.text + ':00.000001'
     input_format = "%Y.%m.%d %H:%M:%S.%f"
@@ -89,9 +101,11 @@ async def post_correct_time_sent(message, state: FSMContext, user_gateway: UserG
 
     # Добавляем это в бд, ибо данных достаточно
     post_data = await state.get_data()
-    await user_gateway.add_post(category_id=post_data['post_subcat_id'],
-                                content=post_data['post_content'],
-                                scheduled_at=post_data['post_sheduled_at'])
+    content = post_data['post_content']
+    scheduled_at = post_data['post_sheduled_at']
+    post_id = await user_gateway.add_post(category_id=post_data['post_subcat_id'],
+                                content=content,
+                                scheduled_at=scheduled_at)
 
     await message.answer(text='Отлично, вы добавили пост в базу данных!\n'
                               'Он выйдет в назначенное вами время',
@@ -99,16 +113,20 @@ async def post_correct_time_sent(message, state: FSMContext, user_gateway: UserG
 
     await state.clear()
 
+    apscheduler.add_job(send_post_to_subscribers, trigger='date', run_date=scheduled_at,
+                      kwargs={'bot': bot, 'post_id': post_id, 'post_content': content})
+
+    await user_gateway.upload_post_status(post_id=post_id)
+
 
 @router.message(StateFilter(FSMFillForm.fill_post_sheduled_at))
 async def post_incorrect_time_sent(message, state: FSMContext, user_gateway: UserGateway):
     """Если ввели некорректное время"""
     await message.answer(text='Введите корректное время.')
-    print(state.get_state())
 
 
 @router.message(F.text == 'Удалить пост')
-async def delete_new_post_press(message, state: FSMContext):
+async def delete_new_post_press(message, state: FSMContext, user_gateway: UserGateway):
     """admin_keyboard: клик 'Удалить пост' (можно удалить только последние 5 из подкатегории)"""
     await message.reply(text='Введите <i>id</i> поста. Например: 8\n'
                              'Его можно получить посмотрев архиве.\n'
@@ -130,7 +148,7 @@ async def correct_delete_post_id(message, state: FSMContext, user_gateway: UserG
 
 
 @router.message(StateFilter(FSMPostDelete.fill_delete_post_id))
-async def incorrect_delete_post_id(message):
+async def incorrect_delete_post_id(message, state: FSMContext, user_gateway: UserGateway):
     await message.answer(text='Введите правильное <i>id</i> поста')
 
 

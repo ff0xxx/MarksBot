@@ -1,4 +1,4 @@
-from aiogram                    import Router, F
+from aiogram                    import Router, F, Bot
 from aiogram.filters            import StateFilter
 from aiogram.fsm.context        import FSMContext
 from aiogram.types              import CallbackQuery
@@ -13,20 +13,20 @@ from states.my_states           import FSMArchive
 
 router: Router = Router()
 
+
 @router.callback_query(F.data == 'go_back')
 async def select_category(callback,  user_gateway: UserGateway):
     """category_keyboard: клик 'Назад' """
     user_id = callback.from_user.id
     await callback.message.edit_text(text='Выберите категории',
                                      reply_markup=await category_keyboard(user_id=user_id, user_gateway=user_gateway))
+
+
 @router.message(F.text == 'Выбрать категории')
 async def select_category(message,  user_gateway: UserGateway):
     """user_keyboard: клик 'Выбрать категории' """
     await message.answer(text='Выберите категории',
                          reply_markup=await category_keyboard(user_id=message.from_user.id, user_gateway=user_gateway))
-
-
-
 
 
 @router.callback_query(SelectCategoryCallbackData())
@@ -90,15 +90,16 @@ async def get_archive_subcat(callback, state: FSMContext, user_gateway: UserGate
 
 
 @router.message(StateFilter(FSMArchive.fill_archive_deep), IsCorrectArchiveCount())
-async def correct_send_archive(message, state: FSMContext, user_gateway: UserGateway):
+async def correct_send_archive(message, state: FSMContext, user_gateway: UserGateway, bot: Bot):
     user_id = int(message.from_user.id)
     count = int(message.text)
     data = await state.get_data()
     subcat_id = int(data['subcat_id'])
 
-    posts = await user_gateway.get_archive_posts(subcat_id, count)
+    posts = await user_gateway.get_archive_posts(user_id, subcat_id, count)
+
     await message.answer(text=f'Вам будет предоставлено {len(posts)} из {count} постов:')
-    await user_gateway.send_archive(posts, user_id)
+    await user_gateway.send_archive(bot, posts, user_id)
 
     await state.clear()
 

@@ -16,9 +16,11 @@ LEXICON_RU: dict[str: str] = {
 }
 
 LEXICON_COMMANDS = {
-    '/menu': 'Открыть меню',
+    '/start': 'Если бот не отвечает..',
 
     '/cancel': 'Прервать команду',
+
+    '/menu': 'Открыть меню',
 
     '/about': 'О закачике',
 
