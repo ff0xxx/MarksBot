@@ -6,8 +6,9 @@ from db_handler.db_funk         import UserGateway
 from filters.callback_filters   import (SelectCategoryCallbackData, SelectSubcategoryCallbackData,
                                         SelectPostCatCallbackData, SelectPostSubcatCallbackData)
 from filters.message_filters    import IsCorrectArchiveCount
-from keyboards.keyboards        import (category_keyboard, subcategory_keyboard,
-                                        add_post_category_keyboard, add_post_subcategory_keyboard)
+from keyboards.keyboards import (category_keyboard, subcategory_keyboard,
+                                 add_post_category_keyboard, add_post_subcategory_keyboard,
+                                 all_subcategory_subscribe_keyboard)
 from lexicon.lexicon_ru         import LEXICON_RU
 from states.my_states           import FSMArchive
 
@@ -15,11 +16,24 @@ router: Router = Router()
 
 
 @router.callback_query(F.data == 'go_back')
-async def select_category(callback,  user_gateway: UserGateway):
+async def back_category(callback,  user_gateway: UserGateway):
     """category_keyboard: клик 'Назад' """
     user_id = callback.from_user.id
     await callback.message.edit_text(text='Выберите категории',
                                      reply_markup=await category_keyboard(user_id=user_id, user_gateway=user_gateway))
+
+
+@router.callback_query(F.data[:3] == 'all')
+async def select_all_categories(callback: CallbackQuery, user_gateway: UserGateway):
+    """category_keyboard: клик 'Все' """
+    user_id = callback.from_user.id
+    cat_id = int(callback.data.split()[1])
+    sign = callback.data.split()[2]
+    await callback.message.edit_text(text='Выберите подкатегории',
+                                     reply_markup=await all_subcategory_subscribe_keyboard(user_id=user_id,
+                                                                                           cat_id=cat_id,
+                                                                                           sign=sign,
+                                                                                           user_gateway=user_gateway))
 
 
 @router.message(F.text == 'Выбрать категории')
@@ -32,9 +46,11 @@ async def select_category(message,  user_gateway: UserGateway):
 @router.callback_query(SelectCategoryCallbackData())
 async def select_subcategory(callback: CallbackQuery, user_gateway: UserGateway):
     """category_keyboard: клик"""
+    user_id = callback.from_user.id
+    cat_id = int(callback.data[3:])
     await callback.message.edit_text(text='Выберите подкатегории:',
-                                     reply_markup=await subcategory_keyboard(user_id=callback.from_user.id,
-                                                                             cat_id=int(callback.data[3:]),
+                                     reply_markup=await subcategory_keyboard(user_id=user_id,
+                                                                             cat_id=cat_id,
                                                                              user_gateway=user_gateway)
                                      )
 

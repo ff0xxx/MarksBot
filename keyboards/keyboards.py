@@ -88,14 +88,47 @@ async def subcategory_keyboard(user_id, cat_id, user_gateway: UserGateway) -> In
                                       callback_data=f"sub {str(subcat['id'])} {cat_id} {sign}")
         buttons.append(button)
 
-    back_button = InlineKeyboardButton(text='Назад',
-                                       callback_data='go_back')
+    back_button = InlineKeyboardButton(text='Назад', callback_data='go_back')
+
+    # Если хотя бы на одну категорию ОТПИСАН - одписываюсь на все
+    sign_for_all = ('✅', '❌')[any(subcat not in user_subcat_list for subcat in subcat_list)]
+    all_cuts_button = InlineKeyboardButton(text='Все', callback_data=f'all {cat_id} {sign_for_all}')
 
     builder = InlineKeyboardBuilder().row(*buttons, width=3)
-    builder.row(back_button, width=1)
+    builder.row(back_button, all_cuts_button, width=2)
 
     return builder.as_markup()
 
+#####
+
+async def all_subcategory_subscribe_keyboard(user_id, cat_id, sign,  user_gateway: UserGateway) -> InlineKeyboardMarkup:
+    """INLINE-КЛАВИАТУРА ДЛЯ ПОДПИСОК/ОТПИСОК на все ПОДКАТЕГОРИИ"""
+    subcat_list = await user_gateway.get_subcats_by_cat_id(cat_id)
+
+    buttons = []
+
+    if sign == '❌':
+        sign = '✅'
+        func = user_gateway.subscribe_user_to_category_by_id
+    else:
+        sign = '❌'
+        func = user_gateway.unsubscribe_user_from_category_by_id
+
+    for subcat in subcat_list:
+        await func(user_id, int(subcat['id']))
+        subcat_name = subcat['name'] + ': ' + sign
+
+        button = InlineKeyboardButton(text=subcat_name,
+                                      callback_data=f"sub {str(subcat['id'])} {cat_id} {sign}")
+        buttons.append(button)
+
+    back_button = InlineKeyboardButton(text='Назад', callback_data='go_back')
+    all_cuts_button = InlineKeyboardButton(text='Все', callback_data=f'all {cat_id} {sign}')
+
+    builder = InlineKeyboardBuilder().row(*buttons, width=3)
+    builder.row(back_button, all_cuts_button, width=2)
+
+    return builder.as_markup()
 
 #####
 

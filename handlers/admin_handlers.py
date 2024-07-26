@@ -220,3 +220,9 @@ async def add_cat(message, state: FSMContext, user_gateway: UserGateway):
 async def send_echo(message):
     """ХЭНДЛЕР ДЛЯ ОБРАБОТКИ НЕОЖИДАННЫХ СООБЩЕНИЙ"""
     await message.reply(text=LEXICON_RU['echo'])
+
+
+@router.callback_query()
+async def send_echo(callback: CallbackQuery):
+    """ХЭНДЛЕР ДЛЯ ОБРАБОТКИ НЕОЖИДАННЫХ callback"""
+    await callback.message.answer(text="Не пойман callback: " + callback.data)
