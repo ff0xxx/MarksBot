@@ -54,9 +54,9 @@ async def category_keyboard(user_id, user_gateway: UserGateway) -> InlineKeyboar
 
         # если пересечения со всеми subcats у subcats текущей подкатегории
         if set(user_subcats_list) & set(cat_subcats_list):
-            cat_name = cat[1] + '✅'
+            cat_name = cat[1] + ': ✅'
         else:
-            cat_name = cat[1] + '❌'
+            cat_name = cat[1] + ': ❌'
 
         button = InlineKeyboardButton(text=cat_name,
                                       callback_data='cat' + str(cat_id['id']))
@@ -82,7 +82,7 @@ async def subcategory_keyboard(user_id, cat_id, user_gateway: UserGateway) -> In
         else:
             sign = '❌'
 
-        subcat_name = subcat[1] + sign
+        subcat_name = subcat[1] + ': ' + sign
 
         button = InlineKeyboardButton(text=subcat_name,
                                       callback_data=f"sub {str(subcat['id'])} {cat_id} {sign}")
