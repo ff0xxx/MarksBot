@@ -2,7 +2,7 @@ from aiogram            import Bot
 from datetime           import datetime
 from config_data.config import load_config
 
-# 975017404
+
 class UserGateway:
     def __init__(self, connect):
         self._connect = connect
