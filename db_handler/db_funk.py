@@ -2,7 +2,7 @@ from aiogram            import Bot
 from datetime           import datetime
 from config_data.config import load_config
 
-
+# 975017404
 class UserGateway:
     def __init__(self, connect):
         self._connect = connect
@@ -33,9 +33,9 @@ class UserGateway:
                 id SERIAL PRIMARY KEY,
                 content TEXT,
                 category_id BIGINT,
+                file_id TEXT,
                 created_at TIMESTAMP NOT NULL,
                 scheduled_at TIMESTAMP NOT NULL,
-                is_published BOOLEAN DEFAULT FALSE, 
                 FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE ON UPDATE RESTRICT
             )
         """)
@@ -80,16 +80,17 @@ class UserGateway:
             name
         )
 
-    async def add_post(self, content, category_id, scheduled_at):
+    async def add_post(self, content, category_id, file_id, scheduled_at):
         """Вставляем новый пост и получаем id вставленной записи"""
         post_id = await self._connect.fetchval(
             """
-            INSERT INTO Posts (content, category_id, created_at, scheduled_at)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO Posts (content, category_id, file_id, created_at, scheduled_at)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING id
             """,
             content,
             category_id,
+            file_id,
             datetime.now(),
             scheduled_at  # type: datetime
         )
@@ -208,19 +209,6 @@ class UserGateway:
             user_id, cat_id
         )
 
-    ##### POSTS
-
-    async def upload_post_status(self, post_id):
-        """Обновляем статус поста на выложенный"""
-        await self._connect.execute(
-            """
-            UPDATE posts
-            SET is_published = TRUE
-            WHERE id = $1;
-            """,
-            post_id
-        )
-
     ##### ARCHIVE
 
     async def get_archive_posts(self, user_id, cat_id, count: int):
@@ -229,7 +217,7 @@ class UserGateway:
             # берем все посты
             posts = await self._connect.fetch(
                 """
-                SELECT id, content, category_id
+                SELECT id, content, category_id, file_id
                 FROM posts
                 WHERE category_id = $1
                 ORDER BY created_at DESC 
@@ -242,10 +230,10 @@ class UserGateway:
             # берем только опубликованные посты
             posts = await self._connect.fetch(
                 """
-                SELECT id, content, category_id
+                SELECT id, content, category_id, file_id
                 FROM posts
                 WHERE category_id = $1
-                AND is_published = TRUE
+                AND NOW() > scheduled_at
                 ORDER BY created_at DESC 
                 LIMIT $2
                 """,
@@ -260,10 +248,17 @@ class UserGateway:
         for post in posts:
             post_id = post['id']
             post_content = post['content']
+            post_file = post['file_id']
 
             if user_id in load_config().tg_bot.admin_ids:
-                await bot.send_message(chat_id=user_id, text=f'<i>id: {post_id}</i>')
-            await bot.send_message(chat_id=user_id, text=post_content)
+                await bot.send_message(chat_id=user_id, text=f'<b><i>--------id: {post_id}--------</i></b>')
+            else:
+                await bot.send_message(chat_id=user_id, text=f'<b>------------------</b>')
+
+            if post_file is not None:
+                await bot.send_document(chat_id=user_id, document=post_file)
+            if post_content is not None:
+                await bot.send_message(chat_id=user_id, text=post_content)
 
     async def is_post_exist(self, post_id):
         """Возвращаем True, если пост существует, и False в противном случае"""

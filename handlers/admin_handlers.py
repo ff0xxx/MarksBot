@@ -47,8 +47,14 @@ async def subcat_new_post_press(callback: CallbackQuery, state: FSMContext, user
 @router.message(StateFilter(FSMFillForm.fill_post_content))
 async def post_content_sent(message, state: FSMContext, user_gateway: UserGateway):
 
-    # Cохраняем введенный content в хранилище по ключу "content"
-    await state.update_data(post_content=message.text)
+    if message.document:
+        file_id = message.document.file_id
+        content = message.caption
+    else:
+        file_id = None
+        content = message.text
+
+    await state.update_data(post_content=content, file_id=file_id)
 
     await message.answer(text='Теперь введите время публикации поста',
                          reply_markup=await post_time_keyboard(user_gateway))
@@ -64,23 +70,31 @@ async def post_time_press(callback: CallbackQuery, state: FSMContext, user_gatew
         current_time = datetime.now()
         await state.update_data(post_sheduled_at=current_time)
 
-        # Добавляем это в бд, ибо данных достаточно
         post_data = await state.get_data()
+        file_id = post_data['file_id']
         content = post_data['post_content']
+        user_id = callback.from_user.id
         scheduled_at = post_data['post_sheduled_at']
-        post_id = await user_gateway.add_post(category_id=post_data['post_subcat_id'],
-                                              content=content,
-                                              scheduled_at=scheduled_at)
+        # забейте на иногдашную ошибку в sheduled
 
-        await callback.message.answer(text='Отлично, вы добавили пост в базу данных!\n'
-                                           'Он выйдет в назначенное вами время')
+        if file_id is None and content is None:
+            await bot.send_message(chat_id=user_id, text='Такой формат не поддерживается.')
+        else:
+            await callback.message.answer(text='Отлично, вы добавили пост в базу данных!\n'
+                                               'Он выйдет в назначенное вами время')
+
+            # Добавляем это в бд, ибо данных достаточно
+            post_id = await user_gateway.add_post(category_id=post_data['post_subcat_id'],
+                                                  content=content,
+                                                  file_id=file_id,
+                                                  scheduled_at=scheduled_at)
+
+            # добавляем задачу для отправки поста
+            apscheduler.add_job(send_post_to_subscribers, trigger='date', run_date=scheduled_at,
+                                kwargs={'bot': bot, 'post_id': post_id, 'user_id': user_id,
+                                        'post_content': content, 'file_id': file_id})
 
         await state.clear()
-
-        apscheduler.add_job(send_post_to_subscribers, trigger='date', run_date=scheduled_at,
-                            kwargs={'bot': bot, 'post_id': post_id, 'post_content': content})
-
-        await user_gateway.upload_post_status(post_id=post_id)
 
     elif callback.data == 'somewhen':
         await callback.message.answer(text='Введите свое время выхода поста в формате:\n'
@@ -99,24 +113,30 @@ async def post_correct_time_sent(message, state: FSMContext, user_gateway: UserG
 
     await state.update_data(post_sheduled_at=entered_time)
 
-    # Добавляем это в бд, ибо данных достаточно
     post_data = await state.get_data()
+    file_id = post_data['file_id']
     content = post_data['post_content']
+    user_id = message.from_user.id
     scheduled_at = post_data['post_sheduled_at']
-    post_id = await user_gateway.add_post(category_id=post_data['post_subcat_id'],
-                                content=content,
-                                scheduled_at=scheduled_at)
 
-    await message.answer(text='Отлично, вы добавили пост в базу данных!\n'
-                              'Он выйдет в назначенное вами время',
-                         reply_markup=await admin_keyboard())
+    if file_id is None and content is None:
+        await bot.send_message(chat_id=user_id, text='Такой формат не поддерживается.')
+    else:
+        await message.answer(text='Отлично, вы добавили пост в базу данных!\n'
+                                  'Он выйдет в назначенное вами время')
+
+        # Добавляем это в бд, ибо данных достаточно
+        post_id = await user_gateway.add_post(category_id=post_data['post_subcat_id'],
+                                              content=content,
+                                              file_id=file_id,
+                                              scheduled_at=scheduled_at)
+
+        # добавляем задачу для отправки поста
+        apscheduler.add_job(send_post_to_subscribers, trigger='date', run_date=scheduled_at,
+                                  kwargs={'bot': bot, 'post_id': post_id, 'user_id': user_id,
+                                          'post_content': content, 'file_id': file_id})
 
     await state.clear()
-
-    apscheduler.add_job(send_post_to_subscribers, trigger='date', run_date=scheduled_at,
-                      kwargs={'bot': bot, 'post_id': post_id, 'post_content': content})
-
-    await user_gateway.upload_post_status(post_id=post_id)
 
 
 @router.message(StateFilter(FSMFillForm.fill_post_sheduled_at))
@@ -129,7 +149,7 @@ async def post_incorrect_time_sent(message, state: FSMContext, user_gateway: Use
 async def delete_new_post_press(message, state: FSMContext, user_gateway: UserGateway):
     """admin_keyboard: клик 'Удалить пост' (можно удалить только последние 5 из подкатегории)"""
     await message.reply(text='Введите <i>id</i> поста. Например: 8\n'
-                             'Его можно получить посмотрев архиве.\n'
+                             'Его можно получить посмотрев архиве.\n\n'
                              '<tg-spoiler>Можно удалить только последние 5 постов из каждой подкатегории</tg-spoiler>')
     await state.set_state(FSMPostDelete.fill_delete_post_id)
 

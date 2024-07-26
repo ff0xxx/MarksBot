@@ -1,14 +1,14 @@
 from aiogram                    import Router, F, Bot
-from aiogram.filters            import StateFilter
+from aiogram.filters            import StateFilter, ChatMemberUpdatedFilter, KICKED
 from aiogram.fsm.context        import FSMContext
-from aiogram.types              import CallbackQuery
+from aiogram.types              import CallbackQuery, ChatMemberUpdated
 from db_handler.db_funk         import UserGateway
 from filters.callback_filters   import (SelectCategoryCallbackData, SelectSubcategoryCallbackData,
                                         SelectPostCatCallbackData, SelectPostSubcatCallbackData)
 from filters.message_filters    import IsCorrectArchiveCount
-from keyboards.keyboards import (category_keyboard, subcategory_keyboard,
-                                 add_post_category_keyboard, add_post_subcategory_keyboard,
-                                 all_subcategory_subscribe_keyboard)
+from keyboards.keyboards        import (category_keyboard, subcategory_keyboard,
+                                        add_post_category_keyboard, add_post_subcategory_keyboard,
+                                        all_subcategory_subscribe_keyboard)
 from lexicon.lexicon_ru         import LEXICON_RU
 from states.my_states           import FSMArchive
 
@@ -129,3 +129,9 @@ async def incorrect_send_archive(message):
 async def process_help_command(message):
     """user_keyboard: клик 'Обо мне' """
     await message.answer(LEXICON_RU['about'])
+
+
+@router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=KICKED))
+async def process_user_blocked_bot(event: ChatMemberUpdated):
+    """Этот хэндлер будет срабатывать на блокировку бота пользователем"""
+    print(f'Пользователь {event.from_user.id} заблокировал бота')
